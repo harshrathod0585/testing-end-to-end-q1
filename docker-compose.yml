@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: notes_user
+      POSTGRES_PASSWORD: notes_pass
+      POSTGRES_DB: notes_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "notes_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://notes_user:notes_pass@db:5432/notes_db
+      JWT_SECRET: supersecretkey
+      FAKE_NOW: ""   # optional, set to ISO string in tests
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mock-service:
+    build: ./mock-service
+    ports:
+      - "8090:8090"
+
+volumes:
+  pgdata:

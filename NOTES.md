@@ -1,0 +1,13 @@
+# Design Decisions
+
+## Architecture
+- ...
+
+## Trade‑offs
+- ...
+
+## Assumptions
+- ...
+
+## Open Questions
+- ...
