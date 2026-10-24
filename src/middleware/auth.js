@@ -6,10 +6,16 @@ function authMiddleware(req, res, next) {
   if (!auth || !auth.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing token' });
   }
-  const token = auth.slice(7);
+  const token = auth.slice(7).trim();
+  if (!token) {
+    return res.status(401).json({ error: 'Missing token' });
+  }
   try {
     const payload = jwt.verify(token, jwtSecret);
-    req.user = { id: payload.sub };
+    if (!payload || payload.sub === undefined || payload.sub === null) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    req.user = { id: parseInt(payload.sub, 10) };
     next();
   } catch (e) {
     return res.status(401).json({ error: 'Invalid token' });

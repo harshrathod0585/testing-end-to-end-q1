@@ -21,6 +21,10 @@ async function createTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS notes_user_id_idx ON notes(user_id);
+  `);
 }
 
 async function insertUser(email, password) {
@@ -37,11 +41,20 @@ async function seed() {
     await insertUser('alice@example.com', 'alicepwd');
     await insertUser('bob@example.com', 'bobpwd');
     console.log('✅ Seed data inserted');
-    process.exit(0);
+    if (require.main === module) {
+      process.exit(0);
+    }
   } catch (err) {
     console.error('❌ Seed failed', err);
-    process.exit(1);
+    if (require.main === module) {
+      process.exit(1);
+    }
+    throw err;
   }
 }
 
-seed();
+if (require.main === module) {
+  seed();
+}
+
+module.exports = { seed, createTables, insertUser };

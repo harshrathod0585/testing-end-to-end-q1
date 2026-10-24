@@ -3,12 +3,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install production dependencies
-COPY package.json .
-RUN npm ci --only=production
+# Install dependencies
+COPY package*.json ./
+RUN npm install
 
-# Copy source code
+# Copy source code and test suite
 COPY src ./src
+COPY tests ./tests
+COPY jest.config.js ./
 
 EXPOSE 8080
 

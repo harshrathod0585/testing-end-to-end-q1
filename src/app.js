@@ -1,6 +1,6 @@
 const express = require('express');
-const { port } = require('./config');
 const authRouter = require('./routes/auth');
+const registerRouter = require('./routes/register');
 const notesRouter = require('./routes/notes');
 
 const app = express();
@@ -14,6 +14,11 @@ app.get('/health', (req, res) => {
 
 // Auth routes
 app.use('/login', authRouter);
+app.use('/register', registerRouter);
+
+// Aliases under /auth
+app.use('/auth/login', authRouter);
+app.use('/auth/register', registerRouter);
 
 // Notes routes
 app.use('/notes', notesRouter);

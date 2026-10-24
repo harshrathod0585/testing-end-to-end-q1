@@ -1,74 +1,114 @@
-# Notes API – Starter Repository
+# Notes API
 
-## One‑command start
+A simple, robust Notes REST API built with Node.js 20, Express, PostgreSQL 15, and JWT authentication.
+
+## One‑command Start
 
 ```bash
-docker compose up
+docker compose up --build
 ```
 
-The stack consists of three containers:
+The stack consists of three services:
 
-| Service       | Purpose                                   | Port |
-|---------------|-------------------------------------------|------|
-| **api**       | Node 20 + Express REST API                | 8080 |
-| **db**        | PostgreSQL 15 (data persisted in volume)  | –    |
-| **mock-service** | Tiny Express server that records any external calls | 8090 |
+| Service | Purpose | Port |
+|---|---|---|
+| **api** | Node 20 + Express REST API | 8080 |
+| **db** | PostgreSQL 15 (data persisted in Docker volume `pgdata`) | internal |
+| **mock-service** | Express server recording external requests | 8090 |
 
-When everything is healthy you can:
+When healthy:
+- Health check: `GET http://localhost:8080/health` → `{"ok":true}`
+- Login: `POST http://localhost:8080/login` with `{ "email": "...", "password": "..." }` → `{ "token": "..." }`
 
-* `GET http://localhost:8080/health` → `{"ok":true}`
-* `POST http://localhost:8080/login` with `{ "email": "...", "password": "..." }` → `{ "token": "…" }`
+### Seeded Users
 
-### Seeded users
+These accounts are created automatically on database startup:
 
-| Email               | Password |
-|---------------------|----------|
-| alice@example.com   | alicepwd |
-| bob@example.com     | bobpwd   |
+| Email | Password |
+|---|---|
+| `alice@example.com` | `alicepwd` |
+| `bob@example.com` | `bobpwd` |
 
-These accounts are created automatically on container start (see `src/seed.js`).
+---
 
-## Your task
+## API Endpoints
 
-Implement the **Notes** CRUD API under `/notes`:
+### 1. Authentication
 
-| Method | Path            | What it should do |
-|--------|-----------------|-------------------|
-| `GET`  | `/notes`        | Return all notes belonging to the authenticated user |
-| `POST` | `/notes`        | Create a note (`title`, `content`) for the user |
-| `GET`  | `/notes/:id`    | Return a single note **only if it belongs to the user** |
-| `PUT`  | `/notes/:id`    | Update `title` and/or `content` of a note you own |
-| `DELETE`| `/notes/:id`  | Delete a note you own |
+#### Register a new user
+- **POST** `/register` (also aliased at `/auth/register`)
+- **Body:** `{ "email": "user@example.com", "password": "secretpassword" }`
+- **Response:** `201 Created` with `{ "token": "...", "user": { "id": ..., "email": "..." } }`
 
-All routes must:
+#### Log in
+- **POST** `/login` (also aliased at `/auth/login`)
+- **Body:** `{ "email": "alice@example.com", "password": "alicepwd" }`
+- **Response:** `200 OK` with `{ "token": "..." }`
 
-* Require a valid JWT (`Authorization: Bearer <token>`).  
-* Return **400** for missing/invalid fields.  
-* Return **401** when the token is missing or invalid.  
-* Return **403** if a user tries to access another user’s note.  
-* Store timestamps (`created_at`, `updated_at`) in ISO‑8601 format.  
-* When the environment variable `FAKE_NOW` is set (ISO‑8601 string) the service should use that value as the current time – this lets the test suite control time.
+---
 
-### Non‑functional requirements
+### 2. Notes CRUD (`/notes`)
 
-* **Concurrency:** parallel requests must not create duplicate notes or corrupt data.  
-* **Resilience:** data persists across container restarts (Postgres volume).  
-* **Time handling:** all timestamps returned in responses are ISO‑8601 strings, respecting time zones.  
+All routes require `Authorization: Bearer <token>`.
 
-## Rules
+| Method | Path | Description | Status Codes |
+|---|---|---|---|
+| `GET` | `/notes` | List all notes belonging to the authenticated user | `200`, `401` |
+| `POST` | `/notes` | Create a note (`title`, `content`) for the user | `201`, `400`, `401` |
+| `GET` | `/notes/:id` | Return a single note (only if owned by the user) | `200`, `400`, `401`, `403`, `404` |
+| `PUT` | `/notes/:id` | Update `title` and/or `content` of an owned note | `200`, `400`, `401`, `403`, `404` |
+| `DELETE` | `/notes/:id` | Delete an owned note | `200`, `400`, `401`, `403`, `404` |
 
-* **Time box:** 3 hours of focused work (you have 1 day to submit).  
-* You may use any open‑source libraries, but **no external services**.  
-* AI tools (Copilot, ChatGPT, etc.) are allowed.  
-* The project **must** start with a single command `docker compose up`.  
-* Do **not** modify the existing health or login endpoints – they are already functional.  
-* When finished, push the repository to a public Git host and share the URL.
+#### Example Usage
 
-## Submission checklist
+```bash
+# 1. Login and obtain token
+TOKEN=$(curl -s -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","password":"alicepwd"}' \
+  | grep -o '"token":"[^"]*' | cut -d'"' -f4)
 
-1. All CRUD endpoints work as described.  
-2. The test suite (`npm test`) passes.  
-3. `README.md` updated with any extra run‑time instructions (if needed).  
-4. `NOTES.md` filled with your design decisions, trade‑offs, and assumptions.
+# 2. Create a note
+curl -X POST http://localhost:8080/notes \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"title":"Meeting Notes","content":"Antigravity discussion"}'
 
-Good luck! 🚀
+# 3. List notes
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/notes
+
+# 4. Update note
+curl -X PUT http://localhost:8080/notes/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"title":"Updated Meeting Notes"}'
+
+# 5. Delete note
+curl -X DELETE -H "Authorization: Bearer $TOKEN" http://localhost:8080/notes/1
+```
+
+---
+
+## Running Tests
+
+### Option A: Running tests inside Docker container
+
+```bash
+docker compose up -d
+docker compose exec api npm test
+```
+
+### Option B: Running tests locally
+
+```bash
+npm install
+npm test
+```
+
+The test suite runs 31 comprehensive tests covering authentication, authorization, access control isolation, input validation, time travel with `FAKE_NOW`, and concurrency handling.
+
+---
+
+## Design and Architecture
+
+Detailed documentation of architecture, trade-offs, and assumptions is available in [NOTES.md](file:///Users/harshrathod/testing-end-to-end-q1/NOTES.md).
